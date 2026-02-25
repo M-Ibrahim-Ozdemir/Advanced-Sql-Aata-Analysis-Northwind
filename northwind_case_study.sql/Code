@@ -1,1 +1,469 @@
+--((((Soru1:)))) 1997'de En Yüksek Satış Geliri Elde Eden 3 Çalışanı Bulun ve Verimlilik Analizi Yapın  
+--Amaç: Ciro, Ortalama Sepet Tutarı ve Müşteri Derinliğini görmek.
+---Northwind veritabanında, 1997 yılında en fazla satış geliri elde eden 3 çalışanı bulunuz. Çalışanın adı, soyadı ve toplam satış tutarını listeleyiniz. İndirim (Discount) oranını hesaba katınız. 
+--• Her çalışanın ortalama sipariş tutarını hesaplayınız. 
+--• Çalışan başına düşen müşteri sayısını da ekleyerek kimlerin daha geniş bir müşteri kitlesine hizmet verdiğini analiz ediniz.
+
+SELECT top 3 e.FirstName + ' ' + e.LastName as ÇalışanAdSoyad,
+    -- 1. Toplam Satış Geliri (İndirim düşülmüş hali)
+    ROUND(SUM(od.UnitPrice * od.Quantity  * (1 - od.Discount)), 2) as ToplamCiro,
+    -- 2. Çalışan Başına Ortalama Sipariş Tutarı (Verimlilik)
+    -- Toplam Ciro / Toplam Sipariş Sayısı
+    ROUND(SUM((od.UnitPrice * od.Quantity)  * (1-od.Discount)) / COUNT(DISTINCT O.OrderID), 2)  as ortalamaSiparisTutarı,
+    -- 3. Hizmet Verilen Benzersiz Müşteri Sayısı
+    COUNT(DISTINCT o.CustomerID) as MusteriSayısı
+
+from Employees E INNER JOIN Orders o on e.EmployeeID = o.EmployeeID 
+INNER JOIN [OrderDetails] od on o.OrderID = od.OrderID 
+WHERE YEAR(OrderDate) = 1997
+GROUP BY FirstName, LastName
+ORDER BY ToplamCiro DESC
+
+/*
+=========================================================================
+📊 Slayt/Readme: Çalışan Verimlilik Analizi ve Satış Stratejisi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• Hacim Lideri: Margaret Peacock, 57 farklı müşteriye hizmet vererek en geniş ağa ulaşmış ve toplam ciroda (128.8K) 1. sıraya yerleşmiştir.
+• Verimlilik Lideri: Nancy Davolio, sadece 40 müşteriyle çalışmasına (en düşük) rağmen "Ortalama Sipariş Tutarı"nda (1693 birim) zirvededir. Yani az müşteriyle büyük hacimli işler (premium veya toplu satış) yapmaktadır.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Yetenek Transferi (Cross-Training): Nancy'nin sepet tutarını yükselten (Up-selling / Cross-selling) satış taktikleri incelenmeli ve Margaret ile Janet'e kurum içi eğitim olarak verilmelidir.
+• Portföy Yönetimi: Margaret 57 müşteriyle kapasite sınırında olabilir. Hizmet kalitesinin düşmemesi için düşük hacimli müşterileri diğer temsilcilere kaydırılabilir veya kendisine operasyonel bir asistan atanabilir.
+*/
+
+
+
+
+
+
+
+ --((((Soru2)))): En Fazla Ürün Siparişi Veren 5 Müşteriyi ve Kategori Bazlı Satışlarını Listeleyin .  1998 yılında, siparişlerinde en fazla farklı ürünü satın alan ilk 5 müşteriyi bulunuz.
+ --Amaç: Ürün çeşitliliğine önem veren müşterileri bulmak.
+
+--• Müşteri adı ve toplam sipariş edilen ürün sayısını listeleyiniz.• Bu müşterilerin en çok hangi ürün kategorisinden sipariş verdiğini belirleyiniz.
+/* SORU 2: 1998 Yılı En Fazla Farklı Ürün Alan İlk 5 Müşteri
+Amaç: Çapraz satış (Cross-sell) potansiyeli yüksek olan müşterileri bulmak.
+*/
+
+SELECT TOP 5
+    c.CompanyName AS MusteriAdi,
+    -- 1. Farklı ürün çeşidi sayısı (Sorunun asıl istediği - DISTINCT kullanıyoruz)
+    COUNT(DISTINCT od.ProductID) AS FarkliUrunCesidi,
+    -- 2. Toplam satın alınan fiziksel ürün adedi (Yöneticiler hacmi de görmek ister)
+    SUM(od.Quantity) AS ToplamUrunAdedi,
+    -- 3. Müşterinin en çok sipariş verdiği kategori (Alt Sorgu ile)
+    (
+        SELECT TOP 1 cat.CategoryName 
+        FROM Orders o2
+        JOIN [OrderDetails] od2 ON o2.OrderID = od2.OrderID
+        JOIN Products p2 ON od2.ProductID = p2.ProductID
+        JOIN Categories cat ON p2.CategoryID = cat.CategoryID
+        WHERE o2.CustomerID = c.CustomerID AND YEAR(o2.OrderDate) = 1998
+        GROUP BY cat.CategoryName
+        -- Hangi kategoriden 'adet' olarak en çok almışsa onu 1. sıraya getirir
+        ORDER BY SUM(od2.Quantity) DESC 
+    ) AS FavoriKategori
+
+FROM Customers c
+INNER JOIN Orders o ON c.CustomerID = o.CustomerID
+INNER JOIN [OrderDetails] od ON o.OrderID = od.OrderID
+WHERE YEAR(o.OrderDate) = 1998
+GROUP BY c.CustomerID, c.CompanyName
+ORDER BY FarkliUrunCesidi DESC;
+
+/*
+=========================================================================
+📊 Slayt/Readme: Müşteri Ürün Çeşitliliği ve Kategori Analizi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• "Beverages" Dominansı: Ürün çeşitliliğine en çok önem veren ilk 5 müşterinin tamamının favori kategorisi istisnasız "Beverages" (İçecekler). Bu, şirketin en güçlü pazarının içecek sektörü olduğunu net bir şekilde kanıtlıyor.
+• Hacim vs. Çeşitlilik: 'Save-a-lot Markets' hem çok çeşit (31) hem de devasa hacim (1817 adet) alarak dev bir toptancı profili çizerken; 'Rattlesnake Canyon Grocery' aynı çeşidi (31) sadece 438 adetle sipariş etmiş. Yani Rattlesnake, azar azar ama her şeyden denemeyi seven butik bir müşteri.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Çapraz Satış (Cross-Selling): İçecek bağımlılığı bu kadar yüksek olan bu 5 VIP müşteriye, içeceğin yanında giden tamamlayıcı ürünler (Örn: "Confections" - Atıştırmalıklar) numune olarak gönderilmeli ve diğer kategorilerdeki satışlar da tetiklenmelidir.
+• Yeni Ürün Test Grubu (Beta User): Ürün yelpazesini bu kadar geniş kullanan (yeniliğe açık) bu kitle, şirketin piyasaya süreceği yeni ürünlerin ilk test (A/B Testi) grubu olarak değerlendirilmelidir.
+• Hacim Teşviki: 'Rattlesnake' gibi çok çeşit alıp sepeti sığ (az adetli) tutan müşterilere, "Koli/Palet bazlı alımlarda %10 indirim" sunularak sipariş derinliği artırılmalıdır.
+*/
+
+
+
+
+
+
+
+
+--((((Soru3))))): En Çok Sipariş Alan Ülkeyi Bulun ve Fiyatlandırma Stratejisi Geliştirin  ,1997 ve 1998 yıllarında en fazla sipariş veren ülkeyi bulun.  --Amaç: Coğrafi satış gücünü ve fiyat politikasını ölçmek.
+--• Bu ülkelerdeki ortalama sipariş tutarını hesaplayın. 
+--• Diğer ülkelere göre fiyat farkı olup olmadığını inceleyin.
+
+SELECT Top 1 o.ShipCountry as Ulke, 
+    --ToplamSiparisSayisi(hacim)
+    COUNT(Distinct o.OrderID) as ToplamSiparisSayisi,
+    --o ulkedeki ortalamaSepet tutari
+    ROUND(SUM((od.UnitPrice * od.Quantity) * (1-od.Discount)) / COUNT(distinct o.OrderID), 2) as UlkeOrtalamSiparisTutarı,
+
+                --extra : -- Karşılaştırma için: Tüm Dünyanın Ortalama Sepet Tutarı (Sabit Değer)
+            (SELECT ROUND(Sum((od2.UnitPrice * od2.Quantity) * (1-od2.Discount))  / COUNT(DISTINCT o2.OrderID), 2)
+
+            FROM Orders o2
+            JOIN [OrderDetails] od2 ON o2.OrderID = od2.OrderID
+            WHERE YEAR(o2.OrderDate) IN (1997, 1998)
+            )as Dünyagenelortalama
+        
+from Orders o
+Inner JOIN [OrderDetails] od on o.OrderID = od.OrderID
+WHERE YEAR(o.OrderDate) IN (1997, 1998)
+GROUP BY o.ShipCountry
+ORDER BY ToplamSiparisSayisi DESC;
+
+/*
+=========================================================================
+📊 Slayt/Readme: Coğrafi Satış Gücü ve Fiyatlandırma Stratejisi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• Hem Hacim Hem Değer Lideri: ABD (USA), 99 sipariş ile en çok sipariş veren ülke olmasının yanında, 2095.75 birimlik "Ortalama Sipariş Tutarı" ile açık ara en karlı pazardır.
+• Premium Pazar Kanıtı: Dünya geneli ortalama sepet tutarı 1560.04 birim iken, ABD pazarının bunun yaklaşık %34 üzerinde seyretmesi, bu bölgedeki müşterilerin yüksek fiyatlı (premium) ürünlere veya toplu (bulk) alımlara çok daha yatkın olduğunu gösteriyor.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Fiyatlandırma (Pricing) Stratejisi: ABD pazarında agresif indirim (discount) veya fiyat kırma stratejilerine gerek yoktur. Müşterilerin alım gücü ve sepet ortalaması zaten yüksektir; odak nokta "ucuzluk" değil "kalite ve premium hizmet" olmalıdır.
+• Lojistik Yatırımı: Şirketin can damarı olan bu pazarda müşteri memnuniyetini korumak için, ABD'ye özel hızlandırılmış kargo anlaşmaları yapılmalı veya yerel bir dağıtım ağı (hub) kurulmalıdır.
+• Üst Satış (Upselling): Bu pazardaki müşterilere standart ürünler yerine, kar marjı en yüksek olan "Yıldız Ürünler" ve özel paketler pazarlanmalıdır.
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* (((((SORU4))))) : En Yüksek Gelir Getiren 5 Ürünü ve Alternatif Tedarikçi Önerileri
+Toplam satış gelirine göre en yüksek geliri sağlayan ilk 5 ürünü bulunuz.
+• (UnitPrice * Quantity) * (1 - Discount) kullanarak toplam geliri hesaplayınız.
+• Bu ürünlerin hangi tedarikçilerden alındığını analiz edin.
+• Alternatif tedarikçilerin sunduğu fiyatlarla karşılaştırma yapın.*/
+
+--Olay Ne? Şirketin "Yıldız" ürünlerini bulacağız. Sonra da patrona diyeceğiz ki: "Bak bu ürün çok kazandırıyor ama tedarikçisi kim? Pahalı mı alıyoruz? Alternatifi var mı?"
+
+select top 5 
+    p.ProductName as UrunAdi,
+    s.CompanyName as TedarikciAdi,
+    p.CategoryID,
+    --toplam Ciro
+    ROUND(SUM((od.UnitPrice * od.Quantity) * (1-Discount)), 0) as toplamCiro,
+    --urnü  biz kactan satıyoz birim fiat
+    p.UnitPrice as BirimFiyat,
+
+    -- Analiz Kısmı: O Kategorideki Ortalama Fiyat Nedir?
+    -- (Eğer ürünün fiyatı, kategori ortalamasından çok yüksekse "Premium" üründür
+    -- veya tedarikçi pahalıdır yorumu yapılabilir.)
+    (select ROUND(AVG(p2.UnitPrice), 2) 
+    FROM Products p2
+    WHERE p2.CategoryID = p.CategoryID) as KategoriOrtalamaFiyat
+
+
+FROM Products p INNER JOIN [OrderDetails] od on p.ProductID = od.ProductID
+INNER JOIN Suppliers s on p.SupplierID = s.SupplierID
+GROUP BY p.ProductName, s.CompanyName, p.UnitPrice, p.CategoryID
+ORDER BY toplamCiro DESC
+
+
+/*
+=========================================================================
+📊 Slayt/Readme: Ürün Karlılığı ve Tedarikçi Risk Analizi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• Ultra-Premium Yıldız Ürün: "Côte de Blaye" ürünü 263.50 birim fiyatıyla ait olduğu kategorinin (İçecekler) ortalama fiyatının (37.98) yaklaşık 7 katı olmasına rağmen en yüksek ciroyu (141K) getiriyor. Bu ürünün fiyat esnekliği (price elasticity) çok düşüktür; yani müşteriler fiyata değil markaya/kaliteye odaklıdır.
+• Tedarikçi Konsantrasyonu: En çok kazandıran 5 ürünün 2'si (Raclette ve Camembert) tek bir tedarikçiden ("Gai pâturage") sağlanıyor. 
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Tedarikçi Riski Yönetimi (Supplier Risk): Şirket cirosunun çok büyük bir kısmı "Aux joyeux ecclésiastiques" (Côte de Blaye tedarikçisi) ve "Gai pâturage" firmalarına bağlıdır. Bu tedarikçilerle mutlaka uzun vadeli fiyat sabitleme (hedging) kontratları yapılmalı. Olası bir tedarik zinciri krizinde şirketin beli bükülmemesi için acilen bu kaliteye denk "Alternatif B planı" tedarikçiler bulunmalıdır.
+• Premium Ürün Stratejisi: Tablo gösteriyor ki şirket "sürümden (ucuz maldan)" değil, yüksek fiyatlı (premium) mallardan para kazanıyor. Bu nedenle pazarlama ve reklam bütçeleri, ucuz ürünleri itmek yerine bu yüksek marjlı ürünlerin sadık müşterilerine (VIP) harcanmalıdır.
+*/
+
+--Extra NOT: Örneğin 'Côte de Blaye' ürünü en çok ciroyu getiriyor ama fiyatı kategori ortalamasının 5 katı. Bu üründe tedarikçiye çok bağımlıyız, tedarikçi zam yaparsa risk oluşur."
+
+
+
+
+
+
+
+
+/* ((((Soru5)))) : ↗ 1997 ve 1998'de En Çok Satış Yapan İlk 5 Çalışanı Karşılaştırın ve 1999 İçin Tahmini
+Performans Senaryosu Oluşturun
+1997 ve 1998 yıllarında en fazla satış yapan ilk 5 çalışanı bulun.
+• İki yıl üst üste listede olan çalışanları belirleyin.
+• Her çalışanın yıllık satış artış oranını hesaplayın.
+• Eğer çalışanlar aynı oranda performanslarını artırmaya devam ederse, 1999 yılında
+ne kadar satış yapacaklarını tahmin edin.
+*/
+
+--Amaç: İstikrarlı çalışanları bulup gelecek yıl ne kadar satacaklarını öngörmek.
+
+
+
+-- 1. ADIM: 1997 Satışlarını Hesapla (Geçici Tablo)
+WITH Satis1997 AS (
+    SELECT e.EmployeeID, e.FirstName + ' ' + e.LastName AS AdSoyad, 
+           SUM((od.UnitPrice * od.Quantity) * (1 - od.Discount)) AS Ciro97
+    FROM Employees e
+    JOIN Orders o ON e.EmployeeID = o.EmployeeID
+    JOIN [OrderDetails] od ON o.OrderID = od.OrderID
+    WHERE YEAR(o.OrderDate) = 1997
+    GROUP BY e.EmployeeID, e.FirstName, e.LastName
+),
+-- 2. ADIM: 1998 Satışlarını Hesapla
+Satis1998 AS (
+    SELECT e.EmployeeID, 
+           SUM((od.UnitPrice * od.Quantity) * (1 - od.Discount)) AS Ciro98
+    FROM Employees e
+    JOIN Orders o ON e.EmployeeID = o.EmployeeID
+    JOIN [OrderDetails] od ON o.OrderID = od.OrderID
+    WHERE YEAR(o.OrderDate) = 1998
+    GROUP BY e.EmployeeID
+)
+-- 3. ADIM: İki Yılı Birleştir, Büyümeyi Hesapla ve 1999'u Tahmin Et
+SELECT TOP 5
+    t97.AdSoyad,
+    ROUND(t97.Ciro97, 0) AS [1997_Ciro],
+    ROUND(t98.Ciro98, 0) AS [1998_Ciro],
+    
+    -- Büyüme Oranı: (Yeni - Eski) / Eski
+    FORMAT((t98.Ciro98 - t97.Ciro97) / t97.Ciro97, 'P') AS BuyumeOrani,
+    
+    -- 1999 Tahmini: 1998 Cirosu + (1998 Cirosu * Büyüme Oranı)
+    ROUND(t98.Ciro98 * (1 + ((t98.Ciro98 - t97.Ciro97) / t97.Ciro97)), 0) AS [1999_Tahmini_Ciro]
+
+FROM Satis1997 t97
+INNER JOIN Satis1998 t98 ON t97.EmployeeID = t98.EmployeeID
+ORDER BY t98.Ciro98 DESC; -- 1998'deki performansa göre sıraladık
+
+/*
+=========================================================================
+📊 Slayt/Readme: Performans Eğilimleri (Trend) ve Tahminleme Analizi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• Veri Anomalisi Tespiti: Tablodaki keskin düşüşler (Margaret %58, Nancy %32) şirketin battığını değil, 1998 yılı verisinin eksik (sadece ilk çeyrek/5 ay) olduğunu işaret eden bir "Veri Anomalisi"dir. 12 aylık veri ile 5 aylık veri kıyaslandığı için büyüme oranları ve 1999 tahminleri yanıltıcı (negatif) çıkmıştır.
+• Aykırı Değer (Outlier) Başarısı: Tüm ekip eksik ay kapanışı nedeniyle ekside görünürken, Andrew Fuller'ın pozitif büyüme (%5.53) göstermesi muazzamdır. Andrew, 1998'in sadece bir bölümünde, 1997'nin tamamında yaptığı ciroyu aşmıştır.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Analiz Modelinin Revizesi (YTD Analiz): Sağlıklı bir 1999 tahmini (Forecast) yapabilmek için, YoY (Yıldan Yıla) karşılaştırma yerine YTD (Yılbaşından Bugüne - Örn: Sadece Ocak-Mayıs ayları) kıyası yapılmalı ve tahmin modeli güncellenmelidir. Veriye körü körüne güvenilmemelidir.
+• 'Best Practice' İncelemesi: Kriz döneminde veya daralan takvimde bile rekor kıran Andrew Fuller'ın 1998'deki müşteri portföyü ve satış taktikleri acilen incelenmeli, şirketin "Örnek Satış Senaryosu" olarak diğer çalışanlara öğretilmelidir.
+*/
+
+--Modeli kurdum ama verideki ay eksikliğini fark edip tahmine şerh düştüm
+
+
+
+
+
+
+
+/*((((Soru6)))) : Stok Miktarı Düşük Ürünleri Belirleyin ve Tedarik Zinciri Stratejisi Geliştirin
+Son 3 ay içinde satılan ancak şu anda stok miktarı 20'nin altında olan ürünleri listeleyin.
+• Ürün adı, mevcut stok miktarı ve son sipariş tarihi gösterilmelidir.
+• Tedarik süresi uzun olan ürünleri belirleyin ve erken sipariş verilmesi gereken
+ürünleri analiz edin.
+*/
+--Amaç: Talep gören ama stoku tükenmek üzere olan riskli ürünleri belirlemek.
+-- Önce veritabanındaki "Bugün"ü bulalım (En son sipariş tarihi)
+Declare @SonTarih DATE = (select Max(OrderDate) FROM Orders);
+
+select distinct p.ProductName as ÜrünAdi,
+       p.UnitsInStock as MevcutStok,
+       p.ReorderLevel as KritikStokSeviyesi,   -- Fabrikanın "Sipariş Ver" dediği sınır
+       (select Max(o2.OrderDate)
+       FROM Orders o2
+       JOIN [OrderDetails] od2 on o2.OrderID = od2.OrderID
+       WHERE od2.ProductID = p.ProductID) as SonSatisTarihi
+ 
+    
+from  Products P
+Inner JOIN[OrderDetails] od on p.ProductID = od.ProductID
+Inner JOIN Orders o on o.OrderID = od.OrderID
+WHERE
+-- Son 3 ayda satılmış olsun (Talep var mı?)
+    o.OrderDate >= DATEADD(Month , -3, @SonTarih)
+-- Ama stok 20'nin altında olsun (Risk var mı?)
+    and p.UnitsInStock < 20
+ORDER by p.UnitsInStock ASC;    
+--SELECT MAX(OrderDate) diyerek veritabanındaki en son kesilen faturanın tarihini bulduk (Örnek: 6 Mayıs 1998)
+--DATEADD(Month, -3, @SonTarih) Nedir? = Geriye doğru 3 ay gideceğim 
+--o.OrderDate >= ... Nedir?  Sipariş tarihi 6 Şubat 1998'den büyük (sonra) olanları getir.
+
+
+/*
+=========================================================================
+📊 Slayt/Readme: Kritik Stok Yönetimi ve Tedarik Zinciri Kriz Analizi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• Yok Satan Yıldızlar (Out-of-Stock Stars): Önceki analizlerde (4. Soru) şirkete en çok ciro getiren 2. ürün olarak tespit edilen "Thüringer Rostbratwurst"un mevcut stoku 0'dır! Keza 1 numaralı premium ürün olan "Côte de Blaye" stoku da 17'ye düşerek kritik sınıra (15) dayanmıştır. Şirket şu an en karlı ürünlerinde satış kaçırmaktadır.
+• Tedarik Zinciri Kırılması: "Gorgonzola Telino" veya "Louisiana Hot Spiced Okra" gibi ürünlerde stok, "Kritik Stok Seviyesinin (Reorder Level)" çok altına inmesine (hatta sıfırlanmasına) rağmen yeni ürün gelmemiştir. Yani sistem alarm vermiş ama satın alma/tedarik süreci işlememiştir. Ayrıca bazı ürünlerin Reorder Level değeri "0" bırakılarak sistemsel takipsizliğe düşülmüştür.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Acil Aksiyon (Emergency Restock): Ciro lideri olup stoku tükenen veya tükenmek üzere olan ürünlere (Thüringer Rostbratwurst, Côte de Blaye) anında "Hızlandırılmış Nakliye (Expedited Shipping)" ile sipariş geçilmelidir. Nakliye maliyeti artsa bile kaçan fırsat maliyetinden (Opportunity Cost) daha ucuzdur.
+• Sistem Parametrelerinin Güncellenmesi: ERP sistemindeki "Reorder Level" değeri 0 olan ürünler acilen güncellenmelidir. Fabrikanın "Sipariş Ver" uyarı sınırı statik olmaktan çıkarılıp, ürünün tedarik süresi (Lead Time) ve satış hızına göre dinamik olarak hesaplanmalıdır.
+*/
+
+
+
+
+
+
+/*((((Soru7)))) : Çalışanların Aylık Satışlarını Gösteren Pivot Tablo Oluşturun ve Ödül Stratejisi
+Belirleyin
+Çalışanların 1997 ve 1998 yıllarındaki satışlarını aylara göre gösteren bir çapraz tablo (pivot)
+oluşturun.
+• Çalışan adı ve soyadı listelenmelidir.
+• Ocak-Aralık ayları sütun olarak gösterilmelidir.
+• Satış performansı yüksek olan ayları belirleyin.
+• En başarılı 3 ay için prim önerisi yapın.
+*/
+
+
+--Amaç: Mevsimselliği ve çalışan istikrarını görmek.
+select 
+    e.FirstName + ' ' + e.LastName as calisan,
+
+    --her ay için ayrı sutun olusturalım
+    SUM(CASE WHEN MONTH(o.OrderDate) = 1 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Ocak,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 2 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Subat,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 3 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Mart,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 4 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Nisan,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 5 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Mayis,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 6 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Haziran,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 7 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Temmuz,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 8 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Ağustos,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 9 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Eylül,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 10 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS Ekim,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 11 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS kasım,
+    SUM(CASE WHEN MONTH(o.OrderDate) = 12 THEN (od.UnitPrice * od.Quantity) * (1-od.Discount) ELSE 0 END) AS aralık,
+
+
+    Sum((od.UnitPrice * Od.Quantity) * (1-Discount)) as geneltoplam
+
+from Employees e
+JOIN Orders o on e.EmployeeID = o.EmployeeID
+JOIN OrderDetails od on o.OrderID = od.OrderID
+WHERE YEAR(o.OrderDate) IN (1997, 1998)
+group by e.FirstName, e.LastName
+ORDER by geneltoplam DESC;
+
+/*
+=========================================================================
+📊 Slayt/Readme: Aylık Satış Trendleri (Pivot) ve Prim Stratejisi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• "Yalancı" Mevsimsellik (Data Overlap Anomalisi): Tabloda Ocak, Şubat, Mart ve Nisan aylarındaki satış hacimleri devasa görünmektedir (Örn: Margaret'in Ocak ayındaki ~43K'lık satışı). Ancak bu gerçek bir mevsimsel zirve değil; 1998 verilerinin Mayıs ayında kesilmesinden dolayı ilk 5 ayın (1997+1998) kümülatif toplanmasıdır. Haziran-Aralık arası sadece 1997'yi yansıttığı için düşük görünmektedir.
+• Bireysel Zirveler (Outliers): Genel anomaliye rağmen, Andrew Fuller'ın Nisan ayındaki 44K'lık satışı ve Janet Leverling'in ilk 4 aydaki olağanüstü istikrarı (her ay 25K-30K bandı) şirket ortalamasının çok üzerindedir.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Adaleti Sağlayan Prim Sistemi: Verideki ay eşitsizliği nedeniyle toplam ciroya bakarak prim dağıtmak adaletsiz olur. Bunun yerine, primler kümülatif toplanan en yüksek aylar olan "Ocak, Şubat ve Nisan" aylarını kapsayacak şekilde "Çeyrek Dönem (Quarterly) Kota Hedefleri" üzerinden verilmelidir. 
+• Düşük Sezon (Slump) Teşviki: Verinin tek yıla düştüğü ve hacmin azaldığı yaz ve sonbahar aylarında (Örn: Ağustos, Ekim) çalışan motivasyonunu yüksek tutmak için "Aylık Özel Kampanya Primleri" devreye alınmalı, bu aylardaki prim çarpanları yüksek tutulmalıdır.
+*/
+
+
+
+
+
+
+/*
+((((Soru8)))) : En Yüksek Satış Geliri Sağlayan 5 Müşteriyi Bulun ve Özel Kampanya Stratejisi Sunun
+Son iki yılın toplam satış gelirine göre en fazla kazanç sağlayan ilk 5 müşteriyi belirleyiniz.
+• Müşteri adı, toplam sipariş tutarı ve sipariş sayısı listelenmelidir.
+• Bu müşterilerin sipariş alışkanlıklarını analiz edin.
+• Bu müşterilere yönelik özel indirim veya sadakat programı önerin
+*/
+
+--Pareto Prensibi (80/20 Kuralı). Ciromuzun büyük kısmını yapan o "kaymak tabaka" müşterileri bulup onları elimizde tutmaya çalışacağız.
+-- Amaç: En çok kazandıran müşterileri kaybetmemek.
+
+select top 5
+        c.CompanyName as Musteriadi,
+        c.Country as Ulke,
+        --toplam harcma(ciro)
+        ROUND(Sum((od.UnitPrice * od.Quantity) * (1 - od.Discount)), 2) as toplamharcama,
+        --kac kere siparis  vermis(sadkat)
+        COUNT(distinct o.OrderID) as siparissayısı,
+        --ortalamasepet tutar
+        ROUND(Sum((od.UnitPrice * od.Quantity) * (1- od.Discount)) / COUNT(distinct o.OrderID),2) as sepettutarı
+
+
+from Customers c
+INNER JOIN Orders o on c.CustomerID = o.CustomerID
+INNER JOIN OrderDetails od on o.OrderID = od.OrderID
+WHERE o.OrderDate >= '1997-01-01' --son iki yılı kapsayan
+GROUP by c.CompanyName , c.Country
+
+/*
+=========================================================================
+📊 Slayt/Readme: VIP Müşteri Analizi ve Sadakat (Loyalty) Stratejisi
+=========================================================================
+1. Analiz (Veri Ne Söylüyor?):
+• "Balina" Müşteri (Whale Client) Tespiti: Avusturya merkezli 'Ernst Handel', 89.306 birimlik toplam harcaması, 24 sipariş sıklığı ve 3.721 birimlik devasa sepet ortalamasıyla açık ara şirketin en değerli (VIP) müşterisidir. Tablodaki diğer müşterilerle (1K-13K arası) kıyaslandığında, tek başına bir ciro canavarıdır.
+• Müşteri Konsantrasyon Riski: Şirketin gelirlerinin çok büyük bir kısmı tek bir müşteriye (Ernst Handel) bağlı görünmektedir. Bu durum, Pareto Prensibi'nin (Gelirlerin %80'inin, müşterilerin %20'sinden gelmesi) ekstrem bir örneğidir.
+
+2. Strateji ve İş Önerileri (Ne Yapmalıyız?):
+• Key Account Management (Özel Müşteri Yönetimi): 'Ernst Handel' gibi şirketin belkemiği olan müşterilere sıradan müşteri muamelesi yapılamaz. Bu firmaya "Özel Müşteri Temsilcisi (KAM)" atanmalı, CEO seviyesinde ilişkiler kurulmalı ve SLA (Hizmet Seviyesi Anlaşması) standartları en üst seviyede tutulmalıdır.
+• Sepet Büyütme (Basket Size) Teşviki: Arjantin pazarındaki müşteriler (Cactus, Océano) düzenli sipariş (5-6 kez) vermelerine rağmen sepet tutarları çok düşüktür (300-600 birim). Bu kitleye "1.000 Birim Üzeri Alımlarda Ücretsiz Lojistik" gibi baremli kampanyalar sunularak ciro derinliği artırılmalıdır.
+*/
+
+
+
+
+
+
+/*
+((((SORU9)))) : En Fazla Sipariş Verilen Günleri Bulun ve İşgücü Planlamasını Optimize Edin
+Northwind veritabanında, haftanın en fazla sipariş verilen günü hangisidir?
+• (Örneğin: Pazartesi, Salı vb.)
+• Toplam sipariş sayısını listeleyiniz.
+• Bu günlerde çalışan sayısı artırılmalı mı? İş gücü planlaması önerisi yapın.
+*/
+/* SORU 9: Gün Bazlı Sipariş Yoğunluğu ve İşgücü Planlaması
+Amaç: Hangi günlerde operasyonun sıkıştığını bulmak.
+*/
+
+SELECT 
+    -- Tarihin içinden gün ismini (Monday, Tuesday...) çeker
+    DATENAME(WEEKDAY, OrderDate) AS Gun, 
+
+    -- O gün toplam kaç sipariş alınmış?
+    COUNT(OrderID) AS ToplamSiparisSayisi
+
+FROM Orders
+GROUP BY DATENAME(WEEKDAY, OrderDate)
+ORDER BY ToplamSiparisSayisi DESC;
+
+
+
+/*
+📊 Slayt: Sipariş Yoğunluğu ve İş Gücü Optimizasyonu
+1. Analiz (Veri Ne Söylüyor?):
+İnanılmaz Dengeli Bir Yük: Siparişler hafta içi günlerine kusursuz bir şekilde dağılmış (164 ile 168 arasında). Ortada bir "pik (zirve)" yaptığı gün yok.
+B2B İş Modeli: Cumartesi ve Pazar günleri listede yok. Bu bize şirketin son tüketiciye (B2C) değil, ağırlıklı olarak diğer şirketlere (B2B - Business to Business) satış yaptığını veya hafta sonu operasyonun tamamen kapalı olduğunu gösteriyor.
+
+2. İş Gücü Planlaması Önerileri (Ne Yapmalıyız?):
+Sabit Kadro Stratejisi: Günler arasında dalgalanma (varyans) olmadığı için, günlük "part-time" eleman çağırmak veya vardiyaları gün gün değiştirmek mantıksızdır. Şirket, sabit ve tam zamanlı bir kadro ile en yüksek verimi alır.
+Pazartesi Sendromu Riski: Sayılar eşit görünse de, Cuma akşamından Pazartesi sabahına kadar biriken mailler, müşteri talepleri ve kargo hazırlıkları Pazartesi günlerini operasyonel olarak daha zorlayıcı yapar. Bu nedenle personelin haftalık izinleri kesinlikle Pazartesi veya Cuma kullandırılmamalıdır. İzinler için en uygun gün Çarşamba'dır.
+Çapraz Eğitim (Cross-Training): Her gün tam kapasite çalışıldığı için, paketleme veya depo ekibinden bir kişinin bile hasta olması sistemi tıkayabilir. Mola zamanlarında işin durmaması için, ofis çalışanlarına (örneğin müşteri hizmetlerine) acil durumlar için temel depo/paketleme eğitimi verilmelidir.
+*/
+
+
+
+
+
+
+
+
+
+
+
 
