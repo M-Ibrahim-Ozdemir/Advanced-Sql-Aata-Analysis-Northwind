@@ -56,7 +56,7 @@ Nine different case studies touching on all departments of the company were anal
 
 ## 📂 File Structure
 * `northwind_case_study.sql`: Contains the end-to-end SQL codes for all questions in the project and detailed "Business Insight" comment blocks written for management.
-* `images/`: Directory containing screenshots of the SQL query results supporting the business insights.
+* `Images/`: Directory containing screenshots of the SQL query results supporting the business insights.
 
 ## 🚀 How to Run
 1. Clone this repository to your local machine.
